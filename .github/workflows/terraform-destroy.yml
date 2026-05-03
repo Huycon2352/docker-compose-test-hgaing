@@ -44,22 +44,22 @@ jobs:
           aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} || echo "Cluster already gone"
 
       # BƯỚC 1: Dọn dẹp K8s TRƯỚC KHI hủy diệt Cluster
-      - name: 🧹 Clean up Kubernetes Resources (ALB, ELB, PVC)
+      - name: 🧹 Clean up Kubernetes Resources
         run: |
-          # Xóa ArgoCD Apps (nếu có) để giải phóng tài nguyên
-          kubectl delete applications.argoproj.io --all -n argocd --timeout=2m || true
+          # 1. Gỡ bỏ finalizers của các Application trước
+          kubectl get applications.argoproj.io -A -o json | jq '(.items[].metadata.finalizers // []) |= []' | kubectl apply -f - || true
 
-          # Xóa các Service LoadBalancer để AWS gỡ bỏ ELB vật lý
-          kubectl delete svc --all --all-namespaces --timeout=5m || true
+          # 2. Xóa tất cả application
+          kubectl delete applications.argoproj.io --all -n argocd --timeout=1m || true
 
-          # Xóa Ingress (ALB)
-          kubectl delete ingress --all --all-namespaces --timeout=5m || true
+          # 3. Xóa các tài nguyên gây tốn tiền (SVC, PVC)
+          kubectl delete svc --all --all-namespaces --timeout=2m || true
+          kubectl delete pvc --all --all-namespaces --timeout=2m || true
 
-          # Xóa PVC để gỡ EBS (Tránh bị kẹt ENI)
-          kubectl delete pvc --all --all-namespaces --timeout=5m || true
+          # 4. Nếu namespace argocd vẫn lì lợm, ép nó xóa luôn
+          kubectl delete ns argocd --timeout=30s || kubectl patch ns argocd -p '{"spec":{"finalizers":null}}' --type merge || true
 
-          echo "Chờ 2 phút để AWS gỡ bỏ ENI và Load Balancer..."
-          sleep 120
+          sleep 60
 
       # BƯỚC 2: Xóa Cluster (Dùng retry để xử lý độ trễ của AWS)
       - name: 💥 Terraform Destroy
