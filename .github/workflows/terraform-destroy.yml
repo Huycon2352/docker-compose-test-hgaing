@@ -18,7 +18,6 @@ jobs:
     name: "Clean up and Destroy"
     runs-on: ubuntu-latest
     timeout-minutes: 60
-
     if: github.event.inputs.confirm_destroy == 'DESTROY'
 
     defaults:
@@ -33,36 +32,44 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: ap-southeast-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - uses: hashicorp/setup-terraform@v3
 
       - name: 📦 Terraform Init
         run: terraform init
 
-      # Connect EKS
       - name: ☸️ Connect to EKS Cluster
-        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} || true
-
-      # Verify access
-      - name: Verify cluster access
-        run: kubectl get nodes || echo "Cluster not accessible"
-
-      # Cleanup k8s
-      - name: 🧹 Clean up Kubernetes Resources
         run: |
-          kubectl delete svc --all --all-namespaces --wait=true || true
-          kubectl delete ingress --all --all-namespaces --wait=true || true
-          kubectl delete pvc --all --all-namespaces || true
-          echo "Waiting AWS cleanup..."
-          sleep 60
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} || echo "Cluster already gone"
 
-      # Destroy EKS first (retry)
-      - name: 💥 Terraform Destroy - Target EKS
+      # BƯỚC 1: Dọn dẹp K8s TRƯỚC KHI hủy diệt Cluster
+      - name: 🧹 Clean up Kubernetes Resources (ALB, ELB, PVC)
         run: |
-          terraform destroy -target="module.eks" -auto-approve || \
-          terraform destroy -target="module.eks" -auto-approve
+          # Xóa ArgoCD Apps (nếu có) để giải phóng tài nguyên
+          kubectl delete applications.argoproj.io --all -n argocd --timeout=2m || true
 
-      # Destroy all
-      - name: 🧨 Terraform Destroy - All
-        run: terraform destroy -auto-approve
+          # Xóa các Service LoadBalancer để AWS gỡ bỏ ELB vật lý
+          kubectl delete svc --all --all-namespaces --timeout=5m || true
+
+          # Xóa Ingress (ALB)
+          kubectl delete ingress --all --all-namespaces --timeout=5m || true
+
+          # Xóa PVC để gỡ EBS (Tránh bị kẹt ENI)
+          kubectl delete pvc --all --all-namespaces --timeout=5m || true
+
+          echo "Chờ 2 phút để AWS gỡ bỏ ENI và Load Balancer..."
+          sleep 120
+
+      # BƯỚC 2: Xóa Cluster (Dùng retry để xử lý độ trễ của AWS)
+      - name: 💥 Terraform Destroy
+        run: |
+          # Thử chạy destroy tối đa 3 lần nếu gặp lỗi Dependency (thường do VPC/Subnet còn vướng tài nguyên)
+          terraform destroy -auto-approve || \
+          (echo "Thử lại lần 2 sau 60s..." && sleep 60 && terraform destroy -auto-approve) || \
+          (echo "Thử lại lần cuối sau 120s..." && sleep 120 && terraform destroy -auto-approve)
+
+      # BƯỚC 3: Hậu kiểm (Option)
+      - name: 🕵️ Post-Destroy Check
+        run: |
+          echo "Hạ tầng đã được yêu cầu xóa. Hãy kiểm tra Console để chắc chắn không còn ELB hoặc EBS nào 'mồ côi'."
