@@ -15,52 +15,11 @@ resource "helm_release" "argocd" {
 
   values = [file("${path.module}/values.yaml")]
 
-  # Thêm dòng này để chắc chắn namespace tạo xong mới chạy Helm
   depends_on = [kubernetes_namespace_v1.argocd]
 
-  timeout          = 1200 # Tăng hẳn lên 20 phút cho chắc ăn
-  wait             = true
+  timeout         = 1200
+  wait            = true
   force_update    = true
   recreate_pods   = true
-  cleanup_on_fail  = true # Nếu lỗi thì xóa làm lại sạch sẽ
-}
-
-# Đợi ArgoCD ổn định một chút rồi mới tạo Root App
-resource "time_sleep" "wait_for_argocd" {
-  depends_on = [helm_release.argocd]
-  create_duration = "30s"
-}
-
-resource "kubernetes_manifest" "root_app" {
-  provider = kubernetes
-
-  depends_on = [time_sleep.wait_for_argocd]
-
-  manifest = {
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name      = "root-app"
-      namespace = "argocd"
-    }
-    spec = {
-      project = "default"
-      source = {
-        repoURL        = "https://github.com/hgiang25/k8s-gitops.git"
-        targetRevision = "main"
-        path           = "clusters"
-      }
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = "argocd"
-      }
-      syncPolicy = {
-        automated = {
-          prune    = true
-          selfHeal = true
-        }
-        syncOptions = ["CreateNamespace=true"]
-      }
-    }
-  }
+  cleanup_on_fail = true
 }
