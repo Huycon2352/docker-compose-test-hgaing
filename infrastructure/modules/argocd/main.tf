@@ -46,7 +46,7 @@ resource "kubernetes_manifest" "root_app" {
       source = {
         repoURL        = "https://github.com/hgiang25/k8s-gitops.git"
         targetRevision = "main"
-        path           = "argocd"
+        path           = "clusters"
       }
       destination = {
         server    = "https://kubernetes.default.svc"

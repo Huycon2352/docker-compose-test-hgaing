@@ -6,5 +6,8 @@ terraform {
     kubernetes = {
       source = "hashicorp/kubernetes"
     }
+     time = {
+      source = "hashicorp/time"
+    }
   }
 }
