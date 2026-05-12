@@ -59,11 +59,9 @@ module "eks" {
       subnet_ids = var.private_subnet_ids
 
       iam_role_additional_policies = {
-        AmazonEC2ContainerRegistryReadOnly =
-          "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        AmazonEC2ContainerRegistryReadOnly = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 
-        AmazonEBSCSIDriverPolicy =
-          "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+        AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
       }
     }
   }
