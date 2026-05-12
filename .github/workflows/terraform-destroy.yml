@@ -255,6 +255,9 @@ jobs:
       - name: Delete remaining IAM roles and policies
         continue-on-error: true
         run: |
+          # =====================================================
+          # DELETE ADMIN ROLE
+          # =====================================================
           aws iam detach-role-policy \
             --role-name management-eks-admin-role \
             --policy-arn arn:aws:iam::248195880649:policy/management-EKSAdminLimitedPolicy || true
@@ -265,8 +268,39 @@ jobs:
           aws iam delete-policy \
             --policy-arn arn:aws:iam::248195880649:policy/management-EKSAdminLimitedPolicy || true
 
+          # =====================================================
+          # DELETE EBS CSI ROLE
+          # =====================================================
+          ATTACHED_POLICIES=$(aws iam list-attached-role-policies \
+            --role-name management-ebs-csi-role \
+            --query 'AttachedPolicies[*].PolicyArn' \
+            --output text 2>/dev/null || true)
+
+          for policy in $ATTACHED_POLICIES; do
+            aws iam detach-role-policy \
+              --role-name management-ebs-csi-role \
+              --policy-arn $policy || true
+          done
+
           aws iam delete-role \
             --role-name management-ebs-csi-role || true
+
+          # =====================================================
+          # DEV EBS CSI ROLE
+          # =====================================================
+          ATTACHED_POLICIES=$(aws iam list-attached-role-policies \
+            --role-name dev-ebs-csi-role \
+            --query 'AttachedPolicies[*].PolicyArn' \
+            --output text 2>/dev/null || true)
+
+          for policy in $ATTACHED_POLICIES; do
+            aws iam detach-role-policy \
+              --role-name dev-ebs-csi-role \
+              --policy-arn $policy || true
+          done
+
+          aws iam delete-role \
+            --role-name dev-ebs-csi-role || true
 
       # =========================================================
       # DELETE CLOUDWATCH LOG GROUPS
