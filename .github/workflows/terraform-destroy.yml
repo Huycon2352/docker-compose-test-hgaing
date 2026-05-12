@@ -1,4 +1,4 @@
-name: Full Infrastructure Destroy
+name: Full AWS Infrastructure Destroy
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
     if: github.event.inputs.confirm_destroy == 'DESTROY'
 
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       # =========================================================
@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       # =========================================================
-      # AWS AUTH
+      # AWS LOGIN
       # =========================================================
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -42,21 +42,15 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       # =========================================================
-      # INSTALL KUBECTL
+      # KUBECTL
       # =========================================================
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
 
       # =========================================================
-      # INSTALL JQ
-      # =========================================================
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      # =========================================================
       # CONNECT MANAGEMENT CLUSTER
       # =========================================================
-      - name: Connect Management Cluster
+      - name: Connect management cluster
         continue-on-error: true
         run: |
           aws eks update-kubeconfig \
@@ -64,9 +58,9 @@ jobs:
             --region $AWS_REGION
 
       # =========================================================
-      # REMOVE ARGOCD FINALIZERS
+      # REMOVE FINALIZERS
       # =========================================================
-      - name: Remove ArgoCD Finalizers
+      - name: Remove ArgoCD finalizers
         continue-on-error: true
         run: |
           kubectl get applications.argoproj.io -n argocd -o name | while read app; do
@@ -76,20 +70,20 @@ jobs:
           done
 
       # =========================================================
-      # DELETE ARGOCD APPS
+      # DELETE APPS
       # =========================================================
-      - name: Delete ArgoCD Applications
+      - name: Delete ArgoCD apps
         continue-on-error: true
         run: |
-          kubectl delete applications --all -n argocd --timeout=120s
+          kubectl delete applications --all -n argocd --timeout=120s || true
 
       # =========================================================
       # DELETE LOADBALANCERS
       # =========================================================
-      - name: Delete LoadBalancer Services
+      - name: Delete Kubernetes LoadBalancers
         continue-on-error: true
         run: |
-          kubectl delete svc --all -A --timeout=120s
+          kubectl delete svc --all -A --timeout=180s || true
 
       # =========================================================
       # DELETE PVC
@@ -97,75 +91,129 @@ jobs:
       - name: Delete PVC
         continue-on-error: true
         run: |
-          kubectl delete pvc --all -A --timeout=120s
+          kubectl delete pvc --all -A --timeout=180s || true
 
       # =========================================================
-      # DELETE NAMESPACES
+      # WAIT AWS LB CLEANUP
       # =========================================================
-      - name: Delete Namespaces
-        continue-on-error: true
-        run: |
-          kubectl delete ns argocd dev prod --timeout=120s || true
+      - name: Wait for AWS cleanup
+        run: sleep 180
 
       # =========================================================
-      # WAIT AWS CLEANUP
+      # DESTROY DEV CLUSTER
       # =========================================================
-      - name: Wait AWS Cleanup
-        run: sleep 120
-
-      # =========================================================
-      # DESTROY DEV
-      # =========================================================
-      - name: Terraform Destroy Dev
+      - name: Destroy Dev Infrastructure
         working-directory: infrastructure/environments/dev
         run: |
           terraform init
 
           terraform destroy -auto-approve || \
-          (sleep 60 && terraform destroy -auto-approve)
+          (sleep 120 && terraform destroy -auto-approve)
 
       # =========================================================
-      # DESTROY MANAGEMENT
+      # DESTROY MANAGEMENT CLUSTER
       # =========================================================
-      - name: Terraform Destroy Management
+      - name: Destroy Management Infrastructure
         working-directory: infrastructure/environments/management
         run: |
           terraform init
 
           terraform destroy -auto-approve || \
-          (sleep 60 && terraform destroy -auto-approve)
+          (sleep 120 && terraform destroy -auto-approve)
+
+      # =========================================================
+      # WAIT ENI CLEANUP
+      # =========================================================
+      - name: Wait for ENI cleanup
+        run: |
+          echo "Waiting for EKS ENIs cleanup..."
+          sleep 300
+
+      # =========================================================
+      # FORCE DELETE EC2 INSTANCES
+      # =========================================================
+      - name: Force terminate EC2 instances
+        continue-on-error: true
+        run: |
+          INSTANCE_IDS=$(aws ec2 describe-instances \
+            --filters Name=instance-state-name,Values=running,pending,stopping,stopped \
+            --query "Reservations[*].Instances[*].InstanceId" \
+            --output text)
+
+          if [ ! -z "$INSTANCE_IDS" ]; then
+            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
+          fi
+
+      # =========================================================
+      # DELETE NAT GATEWAYS
+      # =========================================================
+      - name: Delete NAT Gateways
+        continue-on-error: true
+        run: |
+          NAT_IDS=$(aws ec2 describe-nat-gateways \
+            --query "NatGateways[*].NatGatewayId" \
+            --output text)
+
+          for nat in $NAT_IDS; do
+            aws ec2 delete-nat-gateway \
+              --nat-gateway-id $nat || true
+          done
+
+      # =========================================================
+      # WAIT NAT DELETE
+      # =========================================================
+      - name: Wait NAT cleanup
+        run: sleep 180
+
+      # =========================================================
+      # RELEASE EIP
+      # =========================================================
+      - name: Release Elastic IPs
+        continue-on-error: true
+        run: |
+          ALLOC_IDS=$(aws ec2 describe-addresses \
+            --query "Addresses[*].AllocationId" \
+            --output text)
+
+          for eip in $ALLOC_IDS; do
+            aws ec2 release-address \
+              --allocation-id $eip || true
+          done
 
       # =========================================================
       # DESTROY BOOTSTRAP
       # =========================================================
-      - name: Terraform Destroy Bootstrap
+      - name: Destroy Bootstrap Backend
         working-directory: infrastructure/bootstrap
         run: |
           terraform init
-
           terraform destroy -auto-approve || true
 
       # =========================================================
-      # VERIFY EKS
+      # FINAL CHECK
       # =========================================================
-      - name: Verify EKS Deleted
+      - name: Remaining AWS resources
         continue-on-error: true
         run: |
+          echo "==== EKS ===="
           aws eks list-clusters
 
-      # =========================================================
-      # VERIFY ELB
-      # =========================================================
-      - name: Verify ELB Deleted
-        continue-on-error: true
-        run: |
-          aws elbv2 describe-load-balancers || true
+          echo "==== EC2 ===="
+          aws ec2 describe-instances \
+            --query "Reservations[*].Instances[*].[InstanceId,State.Name]" \
+            --output table
 
-      # =========================================================
-      # VERIFY EBS
-      # =========================================================
-      - name: Verify EBS Deleted
-        continue-on-error: true
-        run: |
-          aws ec2 describe-volumes \
-            --filters Name=status,Values=available
+          echo "==== NAT ===="
+          aws ec2 describe-nat-gateways \
+            --query "NatGateways[*].[NatGatewayId,State]" \
+            --output table
+
+          echo "==== EIP ===="
+          aws ec2 describe-addresses \
+            --query "Addresses[*].[PublicIp]" \
+            --output table
+
+          echo "==== VPC ===="
+          aws ec2 describe-vpcs \
+            --query "Vpcs[*].[VpcId,CidrBlock]" \
+            --output table

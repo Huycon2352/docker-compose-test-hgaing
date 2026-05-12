@@ -74,3 +74,7 @@ module "argocd" {
 
   depends_on = [module.eks]
 }
+
+module "ecr" {
+  source = "../../modules/ecr"
+}
