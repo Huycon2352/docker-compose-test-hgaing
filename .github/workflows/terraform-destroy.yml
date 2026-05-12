@@ -63,10 +63,10 @@ jobs:
       - name: Remove ArgoCD finalizers
         continue-on-error: true
         run: |
-          kubectl get applications.argoproj.io -n argocd -o name | while read app; do
+          kubectl get applications.argoproj.io -n argocd -o name 2>/dev/null | while read app; do
             kubectl patch $app -n argocd \
               --type merge \
-              -p '{"metadata":{"finalizers":[]}}'
+              -p '{"metadata":{"finalizers":[]}}' || true
           done
 
       # =========================================================
@@ -94,51 +94,89 @@ jobs:
           kubectl delete pvc --all -A --timeout=180s || true
 
       # =========================================================
-      # WAIT AWS LB CLEANUP
+      # WAIT LOADBALANCERS CLEANUP
       # =========================================================
-      - name: Wait for AWS cleanup
-        run: sleep 180
+      - name: Wait for LoadBalancers cleanup
+        run: |
+          echo "Waiting for LoadBalancers cleanup..."
+
+          for i in {1..40}; do
+            COUNT=$(aws elbv2 describe-load-balancers \
+              --query "length(LoadBalancers)" \
+              --output text 2>/dev/null || echo 0)
+
+            echo "Remaining LoadBalancers: $COUNT"
+
+            if [ "$COUNT" = "0" ]; then
+              echo "All LoadBalancers deleted"
+              exit 0
+            fi
+
+            sleep 15
+          done
+
+          echo "Timeout waiting LoadBalancers cleanup"
 
       # =========================================================
       # DESTROY DEV CLUSTER
       # =========================================================
       - name: Destroy Dev Infrastructure
         working-directory: infrastructure/environments/dev
+        continue-on-error: true
         run: |
           terraform init
 
           terraform destroy -auto-approve || \
-          (sleep 120 && terraform destroy -auto-approve)
+          (sleep 60 && terraform destroy -auto-approve)
 
       # =========================================================
       # DESTROY ARGOCD
       # =========================================================
       - name: Destroy ArgoCD
         working-directory: infrastructure/environments/management-argocd
+        continue-on-error: true
         run: |
           terraform init
 
           terraform destroy -auto-approve || \
-          (sleep 120 && terraform destroy -auto-approve)
+          (sleep 60 && terraform destroy -auto-approve)
 
       # =========================================================
       # DESTROY MANAGEMENT INFRA
       # =========================================================
       - name: Destroy Management Infrastructure
         working-directory: infrastructure/environments/management-infra
+        continue-on-error: true
         run: |
           terraform init
 
           terraform destroy -auto-approve || \
-          (sleep 120 && terraform destroy -auto-approve)
+          (sleep 60 && terraform destroy -auto-approve)
 
       # =========================================================
       # WAIT ENI CLEANUP
       # =========================================================
       - name: Wait for ENI cleanup
         run: |
-          echo "Waiting for EKS ENIs cleanup..."
-          sleep 300
+          echo "Waiting for ENIs cleanup..."
+
+          for i in {1..60}; do
+            COUNT=$(aws ec2 describe-network-interfaces \
+              --filters Name=status,Values=in-use \
+              --query "length(NetworkInterfaces)" \
+              --output text 2>/dev/null || echo 0)
+
+            echo "Remaining ENIs: $COUNT"
+
+            if [ "$COUNT" = "0" ]; then
+              echo "All ENIs deleted"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "Timeout waiting ENIs cleanup"
 
       # =========================================================
       # FORCE DELETE EC2 INSTANCES
@@ -152,7 +190,8 @@ jobs:
             --output text)
 
           if [ ! -z "$INSTANCE_IDS" ]; then
-            aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
+            aws ec2 terminate-instances \
+              --instance-ids $INSTANCE_IDS || true
           fi
 
       # =========================================================
@@ -171,10 +210,29 @@ jobs:
           done
 
       # =========================================================
-      # WAIT NAT DELETE
+      # WAIT NAT CLEANUP
       # =========================================================
       - name: Wait NAT cleanup
-        run: sleep 180
+        run: |
+          echo "Waiting NAT Gateways deletion..."
+
+          for i in {1..40}; do
+            COUNT=$(aws ec2 describe-nat-gateways \
+              --filter Name=state,Values=available,pending,deleting \
+              --query "length(NatGateways)" \
+              --output text 2>/dev/null || echo 0)
+
+            echo "Remaining NAT Gateways: $COUNT"
+
+            if [ "$COUNT" = "0" ]; then
+              echo "All NAT Gateways deleted"
+              exit 0
+            fi
+
+            sleep 15
+          done
+
+          echo "Timeout waiting NAT cleanup"
 
       # =========================================================
       # RELEASE EIP
@@ -192,10 +250,54 @@ jobs:
           done
 
       # =========================================================
+      # FORCE DELETE REMAINING IAM ROLES
+      # =========================================================
+      - name: Delete remaining IAM roles and policies
+        continue-on-error: true
+        run: |
+          aws iam detach-role-policy \
+            --role-name management-eks-admin-role \
+            --policy-arn arn:aws:iam::248195880649:policy/management-EKSAdminLimitedPolicy || true
+
+          aws iam delete-role \
+            --role-name management-eks-admin-role || true
+
+          aws iam delete-policy \
+            --policy-arn arn:aws:iam::248195880649:policy/management-EKSAdminLimitedPolicy || true
+
+          aws iam delete-role \
+            --role-name management-ebs-csi-role || true
+
+      # =========================================================
+      # DELETE CLOUDWATCH LOG GROUPS
+      # =========================================================
+      - name: Delete CloudWatch log groups
+        continue-on-error: true
+        run: |
+          aws logs delete-log-group \
+            --log-group-name /aws/eks/management-cluster/cluster || true
+
+          aws logs delete-log-group \
+            --log-group-name /aws/eks/dev-cluster/cluster || true
+
+      # =========================================================
+      # DELETE KMS ALIASES
+      # =========================================================
+      - name: Delete KMS aliases
+        continue-on-error: true
+        run: |
+          aws kms delete-alias \
+            --alias-name alias/eks/management-cluster || true
+
+          aws kms delete-alias \
+            --alias-name alias/eks/dev-cluster || true
+
+      # =========================================================
       # DESTROY BOOTSTRAP
       # =========================================================
       - name: Destroy Bootstrap Backend
         working-directory: infrastructure/bootstrap
+        continue-on-error: true
         run: |
           terraform init
           terraform destroy -auto-approve || true
@@ -227,4 +329,14 @@ jobs:
           echo "==== VPC ===="
           aws ec2 describe-vpcs \
             --query "Vpcs[*].[VpcId,CidrBlock]" \
+            --output table
+
+          echo "==== IAM ROLES ===="
+          aws iam list-roles \
+            --query "Roles[*].RoleName" \
+            --output table
+
+          echo "==== KMS ALIASES ===="
+          aws kms list-aliases \
+            --query "Aliases[*].AliasName" \
             --output table
