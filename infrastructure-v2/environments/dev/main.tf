@@ -91,6 +91,7 @@ module "ecr" {
   environment = var.environment
 }
 
+/*
 # ============================================================
 # ALB Controller (optional)
 # ============================================================
@@ -122,3 +123,4 @@ module "argocd" {
     module.alb_controller
   ]
 }
+*/
