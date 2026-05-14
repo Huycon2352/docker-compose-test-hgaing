@@ -33,7 +33,7 @@ resource "aws_eks_node_group" "main" {
     ManagedBy   = "Terraform"
   }
 
-  depends_on = [
+  depends_on = {
     var.node_role_arn
   }
 
