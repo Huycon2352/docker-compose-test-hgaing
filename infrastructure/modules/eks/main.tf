@@ -63,6 +63,10 @@ module "eks" {
 
         AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
       }
+      tags = {
+        "k8s.io/cluster-autoscaler/enabled" = "true"
+        "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
+      }      
     }
   }
 

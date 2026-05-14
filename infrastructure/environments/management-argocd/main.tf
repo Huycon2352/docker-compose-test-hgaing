@@ -62,6 +62,9 @@ provider "helm" {
 module "argocd" {
   source = "../../modules/argocd"
 
+  cluster_name     = data.terraform_remote_state.management.outputs.cluster_name
+  oidc_provider_arn = data.terraform_remote_state.management.outputs.oidc_provider_arn
+
   providers = {
     kubernetes = kubernetes
     helm       = helm

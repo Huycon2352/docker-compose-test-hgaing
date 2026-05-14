@@ -4,8 +4,7 @@ terraform {
       source = "hashicorp/helm"
     }
     kubernetes = {
-      source = "hashicorp/kubernetes"
-      configuration_aliases = [ kubernetes ]
+      source = "hashicorp/kubernetes"      
     }
      time = {
       source = "hashicorp/time"
@@ -15,3 +14,6 @@ terraform {
     }
   }
 }
+
+variable "cluster_name" {}
+variable "oidc_provider_arn" {}
