@@ -96,6 +96,11 @@ jobs:
 
       - name: Deploy Prometheus Agent Config
         run: |
+          set -euo pipefail
+          if [ -z "${PROMETHEUS_REMOTE_WRITE_URL:-}" ]; then
+            echo "PROMETHEUS_REMOTE_WRITE_URL is not set; aborting ConfigMap apply"
+            exit 1
+          fi
           envsubst < monitoring/k8s-manifests/prometheus-agent-configmap.yml | kubectl apply -f -
 
       - name: Deploy Prometheus Agent
