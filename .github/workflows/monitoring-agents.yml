@@ -41,6 +41,8 @@ jobs:
 
       - name: Get Prometheus Endpoint from Management Cluster
         run: |
+          set -euo pipefail
+
           aws eks update-kubeconfig \
             --name management-cluster \
             --region ${{ env.AWS_REGION }} \
@@ -49,6 +51,10 @@ jobs:
           PROMETHEUS_HOST=$(kubectl get svc -n ${{ env.MONITORING_NAMESPACE }} kube-prometheus-stack-prometheus -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           if [ -z "$PROMETHEUS_HOST" ]; then
             PROMETHEUS_HOST=$(kubectl get svc -n ${{ env.MONITORING_NAMESPACE }} kube-prometheus-stack-prometheus -o jsonpath='{.spec.clusterIP}')
+          fi
+          if [ -z "$PROMETHEUS_HOST" ]; then
+            echo "Failed to discover Prometheus endpoint in management cluster"
+            exit 1
           fi
 
           echo "PROMETHEUS_REMOTE_WRITE_URL=http://${PROMETHEUS_HOST}:9090/api/v1/write" >> "$GITHUB_ENV"

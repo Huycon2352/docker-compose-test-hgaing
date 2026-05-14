@@ -10,6 +10,7 @@ data:
       evaluation_interval: 15s
 
     remote_write:
+      # PROMETHEUS_REMOTE_WRITE_URL must be substituted (for example via envsubst) before apply.
       - url: ${PROMETHEUS_REMOTE_WRITE_URL}
         write_relabel_configs:
           - source_labels: [__name__]

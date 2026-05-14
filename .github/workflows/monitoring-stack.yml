@@ -67,9 +67,15 @@ jobs:
 
       - name: Get Grafana Initial Password
         run: |
+          set -euo pipefail
+
           GRAFANA_PASSWORD=$(kubectl get secret -n ${{ env.MONITORING_NAMESPACE }} \
             ${{ env.PROMETHEUS_RELEASE_NAME }}-grafana \
             -o jsonpath='{.data.admin-password}' | base64 -d)
+          if [ -z "$GRAFANA_PASSWORD" ]; then
+            echo "Grafana password is empty or unavailable"
+            exit 1
+          fi
           echo "::add-mask::$GRAFANA_PASSWORD"
 
       - name: Display Access Instructions
