@@ -20,9 +20,25 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
         working-directory: infrastructure/bootstrap
+        run: terraform init
+
+      # Import lại resource vào state tạm
+      - name: Import S3
+        working-directory: infrastructure/bootstrap
+        run: |
+          terraform import aws_s3_bucket.tf_state terraform-state-voting-app-123456 || true
+
+      - name: Import DynamoDB
+        working-directory: infrastructure/bootstrap
+        run: |
+          terraform import aws_dynamodb_table.tf_lock terraform-lock || true
+
+      # Empty bucket trước khi destroy
+      - name: Empty S3 Bucket
+        run: |
+          aws s3 rm s3://terraform-state-voting-app-123456 --recursive || true
 
       - name: Terraform Destroy
+        working-directory: infrastructure/bootstrap
         run: terraform destroy -auto-approve
-        working-directory: infrastructure/bootstrap 
