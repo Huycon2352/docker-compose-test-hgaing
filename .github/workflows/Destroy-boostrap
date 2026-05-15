@@ -25,4 +25,4 @@ jobs:
 
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
-        working-directory: infrastructure/bootstrap
+        working-directory: infrastructure/bootstrap 
