@@ -24,7 +24,7 @@ resource "aws_s3_bucket" "terraform_state" {
   bucket = "${var.project_name}-terraform-state-${data.aws_caller_identity.current.account_id}"
 
   tags = {
-    Name        = "${var.project_name}-terraform-state"
+    Name        = "${var.project_name}-terraform-state-${data.aws_caller_identity.current.account_id}"
     Environment = "bootstrap"
     ManagedBy   = "Terraform"
   }
@@ -64,7 +64,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
 # DynamoDB Table cho Terraform Lock
 # ============================================================
 resource "aws_dynamodb_table" "terraform_lock" {
-  name           = "${var.project_name}-terraform-lock"
+  name           = "${var.project_name}-terraform-lock-${data.aws_caller_identity.current.account_id}"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "LockID"
   stream_enabled = false
@@ -75,7 +75,7 @@ resource "aws_dynamodb_table" "terraform_lock" {
   }
 
   tags = {
-    Name        = "${var.project_name}-terraform-lock"
+    Name        = "${var.project_name}-terraform-lock-${data.aws_caller_identity.current.account_id}"
     Environment = "bootstrap"
     ManagedBy   = "Terraform"
   }

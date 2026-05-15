@@ -47,20 +47,20 @@ output "node_group_status" {
   value       = module.node_group.node_group_status
 }
 
-output "ecr_vote_repository_url" {
-  description = "ECR vote app repository URL"
-  value       = module.ecr.vote_repository_url
-}
+# output "ecr_vote_repository_url" {
+#   description = "ECR vote app repository URL"
+#   value       = module.ecr.vote_repository_url
+# }
 
-output "ecr_result_repository_url" {
-  description = "ECR result app repository URL"
-  value       = module.ecr.result_repository_url
-}
+# output "ecr_result_repository_url" {
+#   description = "ECR result app repository URL"
+#   value       = module.ecr.result_repository_url
+# }
 
-output "ecr_worker_repository_url" {
-  description = "ECR worker app repository URL"
-  value       = module.ecr.worker_repository_url
-}
+# output "ecr_worker_repository_url" {
+#   description = "ECR worker app repository URL"
+#   value       = module.ecr.worker_repository_url
+# }
 
 output "configure_kubectl" {
   description = "Command to configure kubectl"

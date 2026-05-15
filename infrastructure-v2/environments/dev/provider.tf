@@ -32,10 +32,10 @@ provider "aws" {
       Project     = "voting-app"
       Environment = var.environment
       ManagedBy   = "Terraform"
-      CreatedAt   = formatdate("YYYY-MM-DD", timestamp())
     }
   }
 }
+
 
 # Get cluster info
 data "aws_eks_cluster" "main" {

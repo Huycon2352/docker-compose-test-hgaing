@@ -11,4 +11,5 @@ variable "aws_account_id" {
 variable "oidc_provider_arn" {
   description = "OIDC provider ARN from EKS cluster"
   type        = string
+  default     = null # Set to null by default, will be provided by EKS module output
 }

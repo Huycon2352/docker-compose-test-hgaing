@@ -3,7 +3,7 @@
 # ============================================================
 
 aws_region     = "ap-southeast-1"
-aws_account_id = "123456789012"  # Replace with your AWS account ID
+aws_account_id = "248195880649"  # Replace with your AWS account ID
 environment    = "dev"
 
 # VPC Configuration

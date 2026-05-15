@@ -35,11 +35,11 @@ module "iam" {
 
   environment        = var.environment
   aws_account_id     = var.aws_account_id
-  oidc_provider_arn  = aws_iam_openid_connect_provider.cluster.arn
+  # oidc_provider_arn  = aws_iam_openid_connect_provider.cluster.arn
 
-  depends_on = [
-    aws_iam_openid_connect_provider.cluster
-  ]
+  # depends_on = [
+  #   aws_iam_openid_connect_provider.cluster
+  # ]
 }
 
 # ============================================================
@@ -58,9 +58,7 @@ module "eks" {
 # ============================================================
 # OIDC Provider (already in eks module, but expose here)
 # ============================================================
-resource "aws_iam_openid_connect_provider" "cluster" {
-  count = 0  # Disabled - using OIDC from EKS module
-}
+# Removed - OIDC is managed by the EKS module
 
 # ============================================================
 # Node Group Module
@@ -82,6 +80,8 @@ module "node_group" {
   ec2_ssh_key        = null
 }
 
+/*
+
 # ============================================================
 # ECR Module
 # ============================================================
@@ -91,7 +91,7 @@ module "ecr" {
   environment = var.environment
 }
 
-/*
+
 # ============================================================
 # ALB Controller (optional)
 # ============================================================

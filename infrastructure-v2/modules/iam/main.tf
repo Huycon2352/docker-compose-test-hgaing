@@ -80,6 +80,7 @@ resource "aws_iam_role_policy_attachment" "eks_container_registry_policy" {
 # ============================================================
 # IAM Role for ALB Controller (IRSA)
 # ============================================================
+/*
 resource "aws_iam_role" "alb_controller_role" {
   name_prefix = "${var.environment}-alb-controller-"
 
@@ -152,3 +153,4 @@ resource "aws_iam_role_policy_attachment" "alb_controller_policy_attachment" {
   role       = aws_iam_role.alb_controller_role.name
   policy_arn = aws_iam_policy.alb_controller_policy.arn
 }
+*/

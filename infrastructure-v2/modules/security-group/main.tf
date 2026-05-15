@@ -33,22 +33,22 @@ resource "aws_security_group" "eks_nodes" {
   description = "Security group for EKS worker nodes"
   vpc_id      = var.vpc_id
 
-  # Allow nodes to communicate with each other
-  ingress {
-    from_port       = 0
-    to_port         = 65535
-    protocol        = "tcp"
-    security_groups = [aws_security_group.eks_nodes.id]
-    description     = "Allow all TCP between nodes"
-  }
+  # # Allow nodes to communicate with each other
+  # ingress {
+  #   from_port       = 0
+  #   to_port         = 65535
+  #   protocol        = "tcp"
+  #   security_groups = [aws_security_group.eks_nodes.id]
+  #   description     = "Allow all TCP between nodes"
+  # }
 
-  ingress {
-    from_port       = 0
-    to_port         = 65535
-    protocol        = "udp"
-    security_groups = [aws_security_group.eks_nodes.id]
-    description     = "Allow all UDP between nodes"
-  }
+  # ingress {
+  #   from_port       = 0
+  #   to_port         = 65535
+  #   protocol        = "udp"
+  #   security_groups = [aws_security_group.eks_nodes.id]
+  #   description     = "Allow all UDP between nodes"
+  # }
 
   # Allow control plane to communicate with nodes
   ingress {
@@ -141,4 +141,29 @@ resource "aws_security_group" "alb" {
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
+}
+
+
+resource "aws_security_group_rule" "eks_nodes_tcp_self" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "tcp"
+
+  security_group_id        = aws_security_group.eks_nodes.id
+  source_security_group_id = aws_security_group.eks_nodes.id
+
+  description = "Allow all TCP between worker nodes"
+}
+
+resource "aws_security_group_rule" "eks_nodes_udp_self" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "udp"
+
+  security_group_id        = aws_security_group.eks_nodes.id
+  source_security_group_id = aws_security_group.eks_nodes.id
+
+  description = "Allow all UDP between worker nodes"
 }
