@@ -140,3 +140,9 @@ variable "prometheus_remote_write_path" {
   type        = string
   default     = "/api/v1/write"
 }
+variable "disk_size" {
+  description = "EBS volume size for nodes (in GB)"
+  type        = number
+  default     = 20
+  
+}

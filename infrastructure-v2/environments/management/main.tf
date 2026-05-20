@@ -61,21 +61,21 @@ module "node_group" {
   max_size           = var.node_max_size
   instance_types     = var.node_instance_types
   capacity_type      = "ON_DEMAND"
-  disk_size          = 30
+  disk_size          = var.disk_size
   ec2_ssh_key        = null
 }
 
-module "monitoring" {
-  source = "../../modules/monitoring"
+# module "monitoring" {
+#   source = "../../modules/monitoring"
 
-  environment               = var.environment
-  remote_write_host         = var.prometheus_remote_write_host
-  remote_write_scheme       = var.prometheus_remote_write_scheme
-  remote_write_port         = var.prometheus_remote_write_port
-  remote_write_path         = var.prometheus_remote_write_path
-  remote_write_namespace    = var.monitoring_namespace
-  remote_write_service_name = var.prometheus_service_name
-}
+#   environment               = var.environment
+#   remote_write_host         = var.prometheus_remote_write_host
+#   remote_write_scheme       = var.prometheus_remote_write_scheme
+#   remote_write_port         = var.prometheus_remote_write_port
+#   remote_write_path         = var.prometheus_remote_write_path
+#   remote_write_namespace    = var.monitoring_namespace
+#   remote_write_service_name = var.prometheus_service_name
+# }
 
 module "dev_management_peering" {
   count  = var.enable_dev_management_peering ? 1 : 0

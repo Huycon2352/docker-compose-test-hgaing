@@ -3,7 +3,7 @@
 # ============================================================
 
 aws_region  = "ap-southeast-1"
-environment = "dev"
+environment = "dev-huy"
 vpc_cidr    = "10.0.0.0/16"
 
 # Multi-AZ configuration
@@ -12,10 +12,11 @@ public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
 private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
 
 aws_account_id       = "248195880649"
-kubernetes_version   = "1.27"
+kubernetes_version   = "1.34"
 
 # Node Group
-node_desired_size   = 2
-node_min_size       = 2
-node_max_size       = 3
-node_instance_types = ["t3.medium"]
+node_desired_size   = 1
+node_min_size       = 1
+node_max_size       = 2
+node_instance_types = ["t3.small"]
+disk_size                      = 30

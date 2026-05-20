@@ -62,25 +62,25 @@ output "configure_kubectl" {
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_id}"
 }
 
-output "prometheus_remote_write_host" {
-  description = "Prometheus host used by remote_write agents"
-  value       = module.monitoring.remote_write_host
-}
+# output "prometheus_remote_write_host" {
+#   description = "Prometheus host used by remote_write agents"
+#   value       = module.monitoring.remote_write_host
+# }
 
-output "prometheus_remote_write_url" {
-  description = "Prometheus remote_write URL that dev agents should export"
-  value       = module.monitoring.remote_write_url
-}
+# output "prometheus_remote_write_url" {
+#   description = "Prometheus remote_write URL that dev agents should export"
+#   value       = module.monitoring.remote_write_url
+# }
 
-output "prometheus_agent_environment_variables" {
-  description = "Environment variables required before rendering the Prometheus agent ConfigMap"
-  value       = module.monitoring.agent_environment_variables
-}
+# output "prometheus_agent_environment_variables" {
+#   description = "Environment variables required before rendering the Prometheus agent ConfigMap"
+#   value       = module.monitoring.agent_environment_variables
+# }
 
-output "prometheus_agent_environment_file" {
-  description = "Shell-compatible export file for Prometheus agent remote_write configuration"
-  value       = module.monitoring.agent_environment_file
-}
+# output "prometheus_agent_environment_file" {
+#   description = "Shell-compatible export file for Prometheus agent remote_write configuration"
+#   value       = module.monitoring.agent_environment_file
+# }
 
 output "dev_management_peering_connection_id" {
   description = "VPC peering connection ID between the dev and management VPCs"

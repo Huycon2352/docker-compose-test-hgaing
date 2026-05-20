@@ -24,8 +24,11 @@ resource "aws_vpc_peering_connection" "this" {
   tags = local.common_tags
 }
 
+# Fix: Chuyển from toset() to map với static keys
 resource "aws_route" "requester_to_accepter" {
-  for_each = toset(var.requester_route_table_ids)
+  for_each = {
+    for idx, rt_id in var.requester_route_table_ids : "route_${idx}" => rt_id
+  }
 
   route_table_id            = each.value
   destination_cidr_block    = var.accepter_vpc_cidr
@@ -33,9 +36,13 @@ resource "aws_route" "requester_to_accepter" {
 }
 
 resource "aws_route" "accepter_to_requester" {
-  for_each = toset(var.accepter_route_table_ids)
+  for_each = {
+    for idx, rt_id in var.accepter_route_table_ids : "route_${idx}" => rt_id
+  }
 
   route_table_id            = each.value
   destination_cidr_block    = var.requester_vpc_cidr
   vpc_peering_connection_id = aws_vpc_peering_connection.this.id
+
+  depends_on = [aws_vpc_peering_connection.this]
 }

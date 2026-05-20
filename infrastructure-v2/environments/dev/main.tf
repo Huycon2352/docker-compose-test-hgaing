@@ -66,6 +66,6 @@ module "node_group" {
   max_size           = var.node_max_size
   instance_types     = var.node_instance_types
   capacity_type      = "ON_DEMAND"
-  disk_size          = 30
+  disk_size          = var.disk_size
   ec2_ssh_key        = null
 }

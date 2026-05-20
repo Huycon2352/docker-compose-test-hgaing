@@ -62,3 +62,10 @@ variable "node_instance_types" {
   type        = list(string)
   default     = ["t3.medium"]
 }
+
+variable "disk_size" {
+  description = "EBS volume size for nodes (in GB)"
+  type        = number
+  default     = 20
+  
+}
