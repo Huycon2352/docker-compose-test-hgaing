@@ -1,4 +1,4 @@
-name: Deploy Management Environment
+name: Deploy Management Environment V2
 
 on:
   workflow_dispatch:
