@@ -96,12 +96,16 @@ jobs:
       - name: Get Management Cluster Nodes IPs
         id: mgmt_nodes
         run: |
+          # Lấy IP đầu tiên từ danh sách nodes
+          MGMT_FIRST_IP=$(kubectl get nodes -o wide | awk 'NR>1 {print $7}' | head -1)
           MGMT_NODE_IPS=$(kubectl get nodes -o wide | awk 'NR>1 {print $7}' | tr '\n' ',')
+          echo "mgmt_first_ip=${MGMT_FIRST_IP}" >> $GITHUB_OUTPUT
           echo "mgmt_node_ips=${MGMT_NODE_IPS%,}" >> $GITHUB_OUTPUT
-          echo "Management Cluster Node IPs: ${MGMT_NODE_IPS%,}"
+          echo "Management Cluster First IP: ${MGMT_FIRST_IP}"
+          echo "Management Cluster All Node IPs: ${MGMT_NODE_IPS%,}"
 
       # ============================================================
-      # 4. Deploy Agent to Dev Cluster
+      # 4. Deploy Agent to Dev Cluster with Dynamic URL
       # ============================================================
       - name: Switch to Dev Cluster Context
         run: |
@@ -113,12 +117,23 @@ jobs:
         run: |
           kubectl create namespace ${{ env.MONITORING_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Create values-dev.yaml with Dynamic Management IP
+        run: |
+          # Lấy nội dung file values-dev.yaml gốc
+          cp ${{ env.MONITORING_DIR }}/values-dev.yaml /tmp/values-dev-temp.yaml
+          
+          # Thay thế IP cũ bằng IP mới từ management cluster
+          sed -i "s|http://[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+:30090/api/v1/write|http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30090/api/v1/write|g" /tmp/values-dev-temp.yaml
+          
+          echo "Updated values-dev.yaml:"
+          cat /tmp/values-dev-temp.yaml
+
       - name: Helm Install/Upgrade Monitoring Agent (Dev)
         run: |
           helm upgrade --install agent \
             ${{ github.event.inputs.helm_repo_name }}/kube-prometheus-stack \
             --namespace ${{ env.MONITORING_NAMESPACE }} \
-            --values ${{ env.MONITORING_DIR }}/values-dev.yaml
+            --values /tmp/values-dev-temp.yaml
 
       - name: Get Dev Cluster Nodes IPs
         id: dev_nodes
@@ -151,8 +166,9 @@ jobs:
           echo "📊 MANAGEMENT CLUSTER (Central Monitoring)"
           echo "   Cluster: ${{ github.event.inputs.management_cluster_name }}"
           echo "   Node IPs: ${{ steps.mgmt_nodes.outputs.mgmt_node_ips }}"
-          echo "   Prometheus URL: http://<node-ip>:30090/prometheus"
-          echo "   Grafana URL: http://<node-ip>:30091"
+          echo "   Management IP for Dev Remote Write: ${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}"
+          echo "   Prometheus URL: http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30090/prometheus"
+          echo "   Grafana URL: http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30091"
           echo "   Grafana Username: admin"
           echo "   Grafana Password: ${{ steps.grafana_password.outputs.grafana_password }}"
           echo ""
@@ -160,6 +176,7 @@ jobs:
           echo "   Cluster: ${{ github.event.inputs.dev_cluster_name }}"
           echo "   Node IPs: ${{ steps.dev_nodes.outputs.dev_node_ips }}"
           echo "   Namespace: ${{ env.MONITORING_NAMESPACE }}"
+          echo "   Remote Write URL: http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30090/api/v1/write"
           echo ""
           echo "=========================================="
 
@@ -171,13 +188,16 @@ jobs:
           
           Management Cluster: ${{ github.event.inputs.management_cluster_name }}
           Management Node IPs: ${{ steps.mgmt_nodes.outputs.mgmt_node_ips }}
+          Management IP for Remote Write: ${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}
           
           Dev Cluster: ${{ github.event.inputs.dev_cluster_name }}
           Dev Node IPs: ${{ steps.dev_nodes.outputs.dev_node_ips }}
           
-          Prometheus: http://<management-node-ip>:30090/prometheus
-          Grafana: http://<management-node-ip>:30091
+          Prometheus: http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30090/prometheus
+          Grafana: http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30091
           Grafana Admin: admin
           Grafana Password: ${{ steps.grafana_password.outputs.grafana_password }}
+          
+          Dev Remote Write: http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30090/api/v1/write
           EOF
           cat deployment-info.txt
