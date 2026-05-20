@@ -167,3 +167,18 @@ resource "aws_security_group_rule" "eks_nodes_udp_self" {
 
   description = "Allow all UDP between worker nodes"
 }
+
+# ============================================================
+# Allow worker nodes to communicate via port 30090 (remote write)
+# ============================================================
+resource "aws_security_group_rule" "eks_nodes_remote_write_tcp" {
+  type                     = "ingress"
+  from_port                = 30090
+  to_port                  = 30090
+  protocol                 = "tcp"
+
+  security_group_id        = aws_security_group.eks_nodes.id
+  source_security_group_id = aws_security_group.eks_nodes.id
+
+  description = "Allow TCP port 30090 between worker nodes for remote write"
+}
