@@ -96,13 +96,22 @@ jobs:
       - name: Get Management Cluster Nodes IPs
         id: mgmt_nodes
         run: |
-          # Lấy IP đầu tiên từ danh sách nodes
-          MGMT_FIRST_IP=$(kubectl get nodes -o wide | awk 'NR>1 {print $7}' | head -1)
-          MGMT_NODE_IPS=$(kubectl get nodes -o wide | awk 'NR>1 {print $7}' | tr '\n' ',')
+          # Lấy IP từ InternalIP hoặc ExternalIP
+          MGMT_FIRST_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+          if [ -z "$MGMT_FIRST_IP" ]; then
+            MGMT_FIRST_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+          fi
+          
+          # Lấy tất cả IPs
+          MGMT_NODE_IPS=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="ExternalIP")].address}' | tr ' ' ',')
+          if [ -z "$MGMT_NODE_IPS" ]; then
+            MGMT_NODE_IPS=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | tr ' ' ',')
+          fi
+          
           echo "mgmt_first_ip=${MGMT_FIRST_IP}" >> $GITHUB_OUTPUT
-          echo "mgmt_node_ips=${MGMT_NODE_IPS%,}" >> $GITHUB_OUTPUT
+          echo "mgmt_node_ips=${MGMT_NODE_IPS}" >> $GITHUB_OUTPUT
           echo "Management Cluster First IP: ${MGMT_FIRST_IP}"
-          echo "Management Cluster All Node IPs: ${MGMT_NODE_IPS%,}"
+          echo "Management Cluster All Node IPs: ${MGMT_NODE_IPS}"
 
       # ============================================================
       # 4. Deploy Agent to Dev Cluster with Dynamic URL
@@ -125,8 +134,8 @@ jobs:
           # Thay thế IP cũ bằng IP mới từ management cluster
           sed -i "s|http://[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+:30090/api/v1/write|http://${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}:30090/api/v1/write|g" /tmp/values-dev-temp.yaml
           
-          echo "Updated values-dev.yaml:"
-          cat /tmp/values-dev-temp.yaml
+          echo "Updated values-dev.yaml with Management IP: ${{ steps.mgmt_nodes.outputs.mgmt_first_ip }}"
+          grep -A 2 "remoteWrite:" /tmp/values-dev-temp.yaml || echo "remoteWrite not found"
 
       - name: Helm Install/Upgrade Monitoring Agent (Dev)
         run: |
@@ -138,9 +147,21 @@ jobs:
       - name: Get Dev Cluster Nodes IPs
         id: dev_nodes
         run: |
-          DEV_NODE_IPS=$(kubectl get nodes -o wide | awk 'NR>1 {print $7}' | tr '\n' ',')
-          echo "dev_node_ips=${DEV_NODE_IPS%,}" >> $GITHUB_OUTPUT
-          echo "Dev Cluster Node IPs: ${DEV_NODE_IPS%,}"
+          # Lấy IP từ ExternalIP hoặc InternalIP
+          DEV_FIRST_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}')
+          if [ -z "$DEV_FIRST_IP" ]; then
+            DEV_FIRST_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+          fi
+          
+          DEV_NODE_IPS=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="ExternalIP")].address}' | tr ' ' ',')
+          if [ -z "$DEV_NODE_IPS" ]; then
+            DEV_NODE_IPS=$(kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | tr ' ' ',')
+          fi
+          
+          echo "dev_first_ip=${DEV_FIRST_IP}" >> $GITHUB_OUTPUT
+          echo "dev_node_ips=${DEV_NODE_IPS}" >> $GITHUB_OUTPUT
+          echo "Dev Cluster First IP: ${DEV_FIRST_IP}"
+          echo "Dev Cluster All Node IPs: ${DEV_NODE_IPS}"
 
       # ============================================================
       # 5. Get Grafana Password & Display Dashboard Info
